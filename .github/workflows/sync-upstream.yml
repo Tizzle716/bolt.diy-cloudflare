@@ -1,0 +1,36 @@
+name: Sync Upstream
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Add Upstream
+        run: |
+          git remote add upstream https://github.com/stackblitz-labs/bolt.diy || echo "Upstream already exists"
+          git fetch upstream
+      - name: Merge Upstream
+        id: merge
+        continue-on-error: true
+        run: git merge upstream/main --no-ff --no-edit
+      - name: Handle Conflicts
+        if: steps.merge.outcome != 'success'
+        run: |
+          echo "Merge conflict detected. Aborting."
+          git merge --abort
+          exit 1
+      - name: Push Changes
+        if: steps.merge.outcome == 'success'
+        run: git push origin main
